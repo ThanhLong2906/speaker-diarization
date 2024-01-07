@@ -352,7 +352,7 @@ async def speaker_recognize(manifest_filepath: str, name: str, collection_name: 
             b = SpeakerEmbedding(cfg)
             print("starting...")
             manifest_embs = b._extract_embeddings(manifest_filepath, 0, 1)
-            print("end")
+            print("end.")
 
             # query
 
