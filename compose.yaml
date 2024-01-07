@@ -1,0 +1,7 @@
+services:
+  api:
+    build:
+      context: .
+      tags: 
+        - nguyenlong2906/speaker-diarization:experiment
+    container_name: speaker-diarization-module
