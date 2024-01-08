@@ -67,7 +67,6 @@ class ClusteringDiarizer:
 
         out_rttm_dir = os.path.join(self._out_dir, 'pred_rttms')
         os.makedirs(out_rttm_dir, exist_ok=True)
-
         # Clustering
         all_reference, all_hypothesis = perform_clustering(
             embs_and_timestamps=embs_and_timestamps, # output of SpeakerEmbedding.diarizer

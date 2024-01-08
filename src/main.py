@@ -226,7 +226,7 @@ async def diarization(voice: UploadFile, name: str, collection_name: Union[str, 
 
 
 @app.post("/diarization", tags=["voice"])
-async def diarization(voice: UploadFile):
+async def diarizer(voice: UploadFile):
     if voice is None:
         raise HTTPException(status_code=400, detail="No audio file provided")
 
@@ -290,32 +290,27 @@ async def diarization(voice: UploadFile):
     
     b = SpeakerEmbedding(config)
     embs_and_timestamps = b.diarizer(_speaker_manifest_path)
-    
+
     c = ClusterEmbedding(config)
     emb_sess_avg_dict, emb_scale_seq_dict, base_clus_label_dict = c.prepare_cluster_embs_infer(embs_and_timestamps=embs_and_timestamps)
 
     d = NeuralDiarizer(config)
     d.diarize(emb_sess_test_dict=emb_sess_avg_dict, emb_seq_test= emb_scale_seq_dict, clus_test_label_dict=base_clus_label_dict)
-
-    del(a._vad_model)
-    del(b._speaker_model)
-    del(d.msdd_model)
-
+    AUDIO_RTTM_MAP = {}
     # create manifest file from rttm
     with open(pred_rttm, "r") as f:
         lines = f.readlines()
-        
-        # create AUDIO_RTTM_MAP
-        AUDIO_RTTM_MAP = {}
-        AUDIO_RTTM_MAP[lines[0].split()[1]] = {'audio_filepath': save_path,
-        'rttm_filepath': pred_rttm,
-        'offset': None,
-        'duration': None,
-        'text': None,
-        'num_speakers': 2,
-        'uem_filepath': None,
-        'ctm_filepath': None}
-        manifest_filepath = os.path.join(tmp_dir,get_uniqname_from_filepath(voice.filename) + "_manifest.json")
+        for idx, line in enumerate(lines):
+            # create AUDIO_RTTM_MAP
+            AUDIO_RTTM_MAP[line.split()[1] + f"_{idx}"] = {'audio_filepath': save_path,
+            'rttm_filepath': pred_rttm,
+            'offset': float(line.split()[3]),
+            'duration': float(line.split()[4]),
+            'text': None,
+            'num_speakers': 2,
+            'uem_filepath': None,
+            'ctm_filepath': None}
+            manifest_filepath = os.path.join(tmp_dir,get_uniqname_from_filepath(voice.filename) + "_manifest.json")
         write_rttm2manifest(AUDIO_RTTM_MAP, manifest_filepath)
 
         # with open(manifest_filepath,'a+') as fp:
@@ -345,31 +340,41 @@ async def speaker_recognize(manifest_filepath: str, name: str, collection_name: 
                     "duration": None
                 }
         else:
+            # separate each 10 lines of manifest_filepath to a new file
+            from utils import json_split
+            list_of_manifest_file = json_split(manifest_filepath, 10)
+            print(list_of_manifest_file)
+            duration = []
+
             voice_emb = torch.as_tensor(np.array(res[0]['vector']))
             # load config
             cfg = OmegaConf.load(MODEL_CONFIG)
+            cfg.diarizer.speaker_embeddings.parameters.save_embeddings = False
             # create service
             b = SpeakerEmbedding(cfg)
-            print("starting...")
-            manifest_embs = b._extract_embeddings(manifest_filepath, 0, 1)
-            print("end.")
+            for file in list_of_manifest_file:
+                
+                print("starting...")
+                manifest_embs = b._extract_embeddings(file, 0, 1)
+                print("end.")
 
-            # query
+                # query
 
-            # calculate result
-            result = sound_similarity(manifest_embs, voice_emb)
-            duration = []
+                # calculate result
+                result = sound_similarity(manifest_embs, voice_emb)
 
-            with open(manifest_filepath, "r") as f:
-                lines = f.readlines()
-                for line, score in zip(lines, result):
-                    # print(f"score: {score}")
-                    if float(score) >= cfg.threshold:
-                        duration.append((float(line['offset']),float(line['offset'])+ float(line['duration'])))
-                resp = {
-                    "speaker": name,
-                    "duration": duration
-                }
+                with open(file, "r") as f:
+                    lines = f.readlines()
+                    for line, score in zip(lines, result):
+                        # print(f"score: {score}")
+                        if float(score) >= cfg.threshold:
+                            duration.append((float(line['offset']),float(line['offset'])+ float(line['duration'])))
+                os.remove(file)
+
+            resp = {
+                "speaker": name,
+                "duration": duration
+            }
             # shutil.rmtree(tmp_dir)
         return JSONResponse(content=resp)
 # @app.get("/verification", tags=["voice"])

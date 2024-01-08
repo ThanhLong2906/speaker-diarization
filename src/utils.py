@@ -1,7 +1,7 @@
 # import cv2
 # import numpy as np
 # import time
-
+import json
 import os
 # import wget
 import logging
@@ -41,3 +41,25 @@ def get_available_model_names(class_name):
     "lists available pretrained model names from NGC"
     available_models = class_name.list_available_models()
     return list(map(lambda x: x.pretrained_model_name, available_models))
+
+def json_split(json_filepath: str, chunk_size: int):
+    list_of_filename = []
+    with open(json_filepath, 'r') as f:
+        j = 0
+        lines = f.readlines()
+        for i in range(chunk_size, len(lines), chunk_size):
+            with open(json_filepath.split(".")[0] + f"_{i}" + ".json", "+w") as nf:
+                list_of_filename.append(json_filepath.split(".")[0] + f"_{i}" + ".json")
+                for m in range(j, i):
+                    json.dump(json.loads(lines[m]), nf)
+                    nf.write('\n')
+            j = i
+        if len(lines)%chunk_size != 0:
+            # write the residual of jsonfile
+            for i in range(j, len(lines)):
+                with open(json_filepath.split(".")[0] + f"_{len(lines)}" + ".json", "+w") as nf:
+                    list_of_filename.append(json_filepath.split(".")[0] + f"_{len(lines)}" + ".json")
+                    json.dump(json.loads(lines[i]), nf)
+                    nf.write('\n')
+    return list_of_filename
+

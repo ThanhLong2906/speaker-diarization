@@ -1,5 +1,5 @@
 from typing import Union, Any, List, Dict
-# from configuration import Settings
+from configuration import Settings
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import os
@@ -70,19 +70,19 @@ class SpeakerEmbedding:
         embedding = self._speaker_model.get_embedding(path2audio)
         return embedding
     
-    # def save_voice(self, path2audio: str, metadatas: List[Dict] | None, collection_name: Union[str, None] = None):
-    #     from vector_store import Milvus
-    #     # from utils import TimeCounter
-    #     if collection_name is None:
-    #         collection_name = "audio_db"
+    def save_voice(self, path2audio: str, metadatas: List[Dict] | None, collection_name: Union[str, None] = None):
+        from vector_store import Milvus
+        # from utils import TimeCounter
+        if collection_name is None:
+            collection_name = "audio_db"
 
-    #     self.app_settings = Settings()
-    #     self.vector_store = Milvus(
-    #         connection_args={"host": self.app_settings.MILVUS_HOST, "port": self.app_settings.MILVUS_PORT},
-    #         collection_name=collection_name
-    #     )
-    #     embedding = np.array(self.embed_voice(path2audio))
-    #     self.vector_store.add_embeddings(embedding, metadatas, timeout=200)
+        self.app_settings = Settings()
+        self.vector_store = Milvus(
+            connection_args={"host": self.app_settings.MILVUS_HOST, "port": self.app_settings.MILVUS_PORT},
+            collection_name=collection_name
+        )
+        embedding = np.array(self.embed_voice(path2audio))
+        self.vector_store.add_embeddings(embedding, metadatas, timeout=200)
 
     def _init_speaker_model(self, speaker_model=None):
         """
@@ -154,7 +154,6 @@ class SpeakerEmbedding:
         self.time_stamps = {}
 
         all_embs = torch.empty([0])
-        print("a")
         for test_batch in tqdm(
             self._speaker_model.test_dataloader(),
             desc=f'[{scale_idx+1}/{num_scales}] extract embeddings',
@@ -171,53 +170,50 @@ class SpeakerEmbedding:
                 emb_shape = embs.shape[-1]
                 embs = embs.view(-1, emb_shape)
                 all_embs = torch.cat((all_embs, embs.cpu().detach()), dim=0)
+                del embs
             del test_batch
-            del embs
-            del audio_signal
-        del self._speaker_model._test_dl
-        del all_embs
-        # with open(manifest_file, 'r', encoding='utf-8') as manifest:
-        #     for i, line in enumerate(manifest.readlines()):
-        #         line = line.strip()
-        #         dic = json.loads(line)
-        #         uniq_name = get_uniqname_from_filepath(dic['audio_filepath'])
-        #         if uniq_name in self.embeddings:
-        #             self.embeddings[uniq_name] = torch.cat((self.embeddings[uniq_name], all_embs[i].view(1, -1)))
-        #         else:
-        #             self.embeddings[uniq_name] = all_embs[i].view(1, -1)
-        #         if uniq_name not in self.time_stamps:
-        #             self.time_stamps[uniq_name] = []
-        #         start = dic['offset']
-        #         end = start + dic['duration']
-        #         self.time_stamps[uniq_name].append([start, end])
 
-        # if self._speaker_params.save_embeddings:
-        #     embedding_dir = os.path.join(self._speaker_dir, 'embeddings')
-        #     if not os.path.exists(embedding_dir):
-        #         os.makedirs(embedding_dir, exist_ok=True)
+        with open(manifest_file, 'r', encoding='utf-8') as manifest:
+            for i, line in enumerate(manifest.readlines()):
+                line = line.strip()
+                dic = json.loads(line)
+                uniq_name = get_uniqname_from_filepath(dic['audio_filepath'])
+                if uniq_name in self.embeddings:
+                    self.embeddings[uniq_name] = torch.cat((self.embeddings[uniq_name], all_embs[i].view(1, -1)))
+                else:
+                    self.embeddings[uniq_name] = all_embs[i].view(1, -1)
+                if uniq_name not in self.time_stamps:
+                    self.time_stamps[uniq_name] = []
+                start = dic['offset']
+                end = start + dic['duration']
+                self.time_stamps[uniq_name].append([start, end])
 
-        #     prefix = get_uniqname_from_filepath(manifest_file)
-        #     name = os.path.join(embedding_dir, prefix)
-        #     self._embeddings_file = name + f'_embeddings.pkl'
-        #     pkl.dump(self.embeddings, open(self._embeddings_file, 'wb'))
-        #     logging.info("Saved embedding files to {}".format(embedding_dir))
+        if self._speaker_params.save_embeddings:
+            embedding_dir = os.path.join(self._speaker_dir, 'embeddings')
+            if not os.path.exists(embedding_dir):
+                os.makedirs(embedding_dir, exist_ok=True)
 
-        return None #self.embeddings
+            prefix = get_uniqname_from_filepath(manifest_file)
+            name = os.path.join(embedding_dir, prefix)
+            self._embeddings_file = name + f'_embeddings.pkl'
+            pkl.dump(self.embeddings, open(self._embeddings_file, 'wb'))
+            logging.info("Saved embedding files to {}".format(embedding_dir))
+
+        return self.embeddings
     
     def diarizer(self, _speaker_manifest_path):
         self._speaker_manifest_path = _speaker_manifest_path
+
         # Segmentation
         scales = self.multiscale_args_dict['scale_dict'].items()
-        for scale_idx, (window, shift) in scales:
 
+        for scale_idx, (window, shift) in scales:
             # Segmentation for the current scale (scale_idx)
             self._run_segmentation(window, shift, scale_tag=f'_scale{scale_idx}')
 
             # Embedding Extraction for the current scale (scale_idx)
             self._extract_embeddings(self.subsegments_manifest_path, scale_idx, len(scales))
-
             self.multiscale_embeddings_and_timestamps[scale_idx] = [self.embeddings, self.time_stamps]
-
         embs_and_timestamps = get_embs_and_timestamps(
             self.multiscale_embeddings_and_timestamps, self.multiscale_args_dict
         )
@@ -237,7 +233,6 @@ def main():
     
     b = SpeakerEmbedding(cfg)
     embs_and_timestamps = b.diarizer(_speaker_manifest_path)
-    print(embs_and_timestamps)
     
 if __name__=='__main__':
     main()

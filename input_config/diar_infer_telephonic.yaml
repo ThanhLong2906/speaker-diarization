@@ -22,7 +22,7 @@ diarizer:
 
   vad:
     # model_path: ../models/vad_multilingual_marblenet.nemo # .nemo local model path or pretrained VAD model name 
-    model_path: "/home/long/experiment-audio-service/models/diar_msdd_telephonic.nemo"
+    model_path: "/home/long/experiment-audio-service/models/vad_multilingual_marblenet.nemo"
     external_vad_manifest: null # This option is provided to use external vad and provide its speech activity labels for speaker embeddings extraction. Only one of model_path or external_vad_manifest should be set
     split_duration: 10
     parameters: # Tuned parameters for CH109 (using the 11 multi-speaker sessions as dev set) 
