@@ -14,7 +14,7 @@ verbose: True # enable additional logging
 threshold: 0.6 # threshold for speaker verification
 
 diarizer:
-  manifest_filepath: "/home/long/experiment-audio-service/input_config/diar_infer_telephonic.yaml"
+  manifest_filepath: "/home/long/experiment-audio-service/thuy-minh-chi-nguyen_5p_2_persons_manifest_62.json"
   out_dir: "./output/"
   oracle_vad: False # If True, uses RTTM files provided in the manifest file to get speech activity (VAD) timestamps
   collar: 0.25 # Collar value for scoring

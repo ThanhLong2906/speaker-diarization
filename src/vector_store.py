@@ -67,7 +67,6 @@ class Milvus(object):
 
         total_count = len(embeddings)
         pks: list[str] = []
-        print(insert_dict)
 
         for i in range(0, total_count, batch_size):
             # Grab end index
@@ -75,7 +74,6 @@ class Milvus(object):
             # Convert dict to list of lists batch for insertion
             insert_list = [insert_dict[x][i:end] for x in self.fields]
             # Insert into the collection.
-            print(f"insert_list: {i}, {end}, {insert_list}")
             res: Collection
             res=self.col.insert(insert_list, timeout=timeout, **kwargs)
             pks.extend(res.primary_keys)
